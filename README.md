@@ -2,7 +2,7 @@
 
 **macOS only** (Apple silicon or Intel, macOS 13 or later). A member of the Dureh family.
 
-Danjam keeps a USB fan (or any power-only USB gadget) on while your Mac is really awake with its screen on, and switches it off while the Mac sleeps and during dark wakes, the short wakes macOS makes for Wi-Fi, Power Nap or a USB event.
+Danjam switches off an **external USB fan plugged into a front USB-C port of a Mac mini M4** while the Mac sleeps, and on again while it is awake with its screen on. The default is the **front-left** port. It also keeps the fan off during dark wakes, the short wakes macOS makes for Wi-Fi, Power Nap or a USB event; macOS powers the port back on at each of them.
 
 - **`danjamd`:** a small Rust daemon. It listens to macOS power capability changes (IOKit `IOPMConnection`):
   - before sleep: the port goes off, and only then does the Mac sleep;
@@ -16,13 +16,15 @@ Danjam keeps a USB fan (or any power-only USB gadget) on while your Mac is reall
 ```sh
 brew tap dureh-gb/tap https://github.com/dureh-gb/homebrew-tap
 brew install danjam
-danjam install --hub 3-1 --port 2     # the hub and port of the fan; see `uhubctl`
+danjam install                 # fan in the front-left port (or: danjam install --front right)
+danjam test                    # the fan should stop for 3 s
 ```
 
 `danjam install` writes a per-user LaunchAgent (`local.danjam`) that runs `danjamd`. macOS then shows a one-time "Background Items Added" notice; keep it allowed. The log is `~/Library/Logs/danjam.log`.
 
-## Find the port
-Run `uhubctl` and look for the hub that has the port your fan is on. Then run `danjam test`: the fan should stop for 3 s. Some hubs show `ppps` but never cut the power; pick a port where `danjam test` really stops the fan.
+## Ports
+- **Mac mini M4 front USB-C:** hub `3-1` (its USB3 half is `3-2`, switched together). Front left = port 2 (default), front right = port 1.
+- **Other ports:** `danjam install --hub <hub> --port <n>` (see `uhubctl`). Many hubs, monitor hubs included, report `ppps` but never cut the power, so check with `danjam test`.
 
 ## Remove
 

@@ -1,7 +1,8 @@
 #!/bin/bash
-# danjam (단잠, "sweet sleep"): a USB fan on while this Mac is really awake (screen on), off in sleep and dark wakes.
+# danjam (단잠, "sweet sleep"): switch off an external USB fan on a Mac mini M4 front USB-C port while the Mac sleeps
+# (and in dark wakes); on again while it is awake with its screen on. macOS only.
 #
-#   danjam install [--hub 3-1] [--port 2]   write the scripts + LaunchAgent and start it
+#   danjam install [--front left|right]       start it for that front port (default: left)
 #   danjam uninstall                        stop it and remove the scripts and LaunchAgent (log kept)
 #   danjam status                           LaunchAgent, port state, recent log and wakes
 #   danjam test                             switch the fan port off for 3 s, then on again
@@ -31,6 +32,9 @@ DOMAIN="gui/$(id -u)"
 
 die() { echo "danjam: $*" >&2; exit 1; }
 need() { [ -n "$1" ] && [ -x "$1" ] || die "${1:-danjamd} is missing (brew install ${2:-$(basename "${1:-danjamd}")})"; }
+# Mac mini M4: the two front USB-C ports are hub 3-1 (USB2 half; uhubctl also switches the USB3 half, 3-2).
+# Front left = port 2, front right = port 1 (2026-10-19). --hub/--port still choose any other port.
+front_port() { case "$1" in left) echo 2 ;; right) echo 1 ;; *) die "--front is left or right" ;; esac; }
 load_conf() { HUB=3-1; PORT=2; [ -f "$CONF" ] && . "$CONF"; return 0; }
 
 # The uhubctl line for one port, or nothing.
@@ -55,6 +59,7 @@ cmd_install() {
 	load_conf
 	while [ $# -gt 0 ]; do
 		case "$1" in
+		--front) HUB=3-1; PORT=$(front_port "$2"); shift 2 ;;
 		--hub) HUB=$2; shift 2 ;;
 		--port) PORT=$2; shift 2 ;;
 		*) die "unknown option $1" ;;
