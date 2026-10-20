@@ -14,14 +14,13 @@ Danjam switches off an **external USB fan plugged into a front USB-C port of a M
 ## Install with Homebrew
 
 **Before you start**
-- macOS. Homebrew refuses other systems.
-- Access to the private `dureh-gb` repositories, with **`gh auth setup-git`** run once. Homebrew clones the source with prompts off and without the macOS keychain helper, so git must get its GitHub credentials from the GitHub CLI (otherwise: `could not read Username for 'https://github.com': terminal prompts disabled`).
-- Homebrew builds danjam from source, so the first install also fetches Homebrew's Rust as a build tool, a few hundred MB. It installs `uhubctl` as a dependency.
+- macOS on Apple silicon. Homebrew refuses other systems.
+- The formula installs a prebuilt arm64 `danjamd` (no Rust needed) and `uhubctl` as a dependency.
 
 **Install**
 
 ```sh
-brew tap dureh-gb/tap https://github.com/dureh-gb/homebrew-tap
+brew tap dureh-gb/tap
 brew trust --formula dureh-gb/tap/danjam    # Homebrew asks you to trust a formula from a new tap once
 brew install danjam
 ```
@@ -45,8 +44,6 @@ brew update
 brew upgrade danjam
 danjam install                 # restarts the LaunchAgent with the new danjamd
 ```
-
-**Latest `main` instead of a release:** `brew install --HEAD danjam`.
 
 ## Ports
 - **Mac mini M4 front USB-C:** hub `3-1` (its USB3 half is `3-2`, switched together). Front left = port 2 (default), front right = port 1.
