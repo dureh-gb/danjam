@@ -18,7 +18,10 @@
 set -euo pipefail
 
 UHUBCTL=/opt/homebrew/bin/uhubctl
-DAEMON="$HOME/.local/bin/danjamd"
+# danjamd next to this command, else on PATH (Homebrew: /opt/homebrew/bin, a stable link across upgrades).
+DAEMON="$(dirname "$0")/danjamd"
+[ -x "$DAEMON" ] || DAEMON="$(command -v danjamd || true)"
+case "$DAEMON" in /*) ;; ?*) DAEMON="$(cd "$(dirname "$DAEMON")" && pwd)/$(basename "$DAEMON")" ;; esac
 LABEL=local.danjam
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 DIR="$HOME/.local/share/danjam"
@@ -27,7 +30,7 @@ LOG="$HOME/Library/Logs/danjam.log"
 DOMAIN="gui/$(id -u)"
 
 die() { echo "danjam: $*" >&2; exit 1; }
-need() { [ -x "$1" ] || die "$1 is missing (brew install $(basename "$1"))"; }
+need() { [ -n "$1" ] && [ -x "$1" ] || die "${1:-danjamd} is missing (brew install ${2:-$(basename "${1:-danjamd}")})"; }
 load_conf() { HUB=3-1; PORT=2; [ -f "$CONF" ] && . "$CONF"; return 0; }
 
 # The uhubctl line for one port, or nothing.
