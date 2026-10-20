@@ -15,7 +15,7 @@ Danjam switches off an **external USB fan plugged into a front USB-C port of a M
 
 **Before you start**
 - macOS. Homebrew refuses other systems.
-- Access to the private `dureh-gb` repositories. Git must be able to clone them over HTTPS: the macOS keychain helper with your GitHub sign-in, or `gh auth setup-git`.
+- Access to the private `dureh-gb` repositories, with **`gh auth setup-git`** run once. Homebrew clones the source with prompts off and without the macOS keychain helper, so git must get its GitHub credentials from the GitHub CLI (otherwise: `could not read Username for 'https://github.com': terminal prompts disabled`).
 - Homebrew builds danjam from source, so the first install also fetches Homebrew's Rust as a build tool, a few hundred MB. It installs `uhubctl` as a dependency.
 
 **Install**
