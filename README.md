@@ -11,16 +11,41 @@ Danjam switches off an **external USB fan plugged into a front USB-C port of a M
 - **`danjam`:** the command. `install`, `uninstall`, `status`, `test`, `log`.
 - Ports are switched with [uhubctl](https://github.com/mvp/uhubctl). A port with a data device on it (shown as `connect`, for example a keyboard receiver) is never switched. No sudo is needed.
 
-## Install
+## Install with Homebrew
+
+**Before you start**
+- macOS. Homebrew refuses other systems.
+- Access to the private `dureh-gb` repositories. Git must be able to clone them over HTTPS: the macOS keychain helper with your GitHub sign-in, or `gh auth setup-git`.
+- Homebrew builds danjam from source, so the first install also fetches Homebrew's Rust as a build tool, a few hundred MB. It installs `uhubctl` as a dependency.
+
+**Install**
 
 ```sh
 brew tap dureh-gb/tap https://github.com/dureh-gb/homebrew-tap
 brew install danjam
-danjam install                 # fan in the front-left port (or: danjam install --front right)
+```
+
+`brew install dureh-gb/tap/danjam` works as well once the tap is added.
+
+**Start it for your fan** (front-left port by default):
+
+```sh
+danjam install                 # or: danjam install --front right
 danjam test                    # the fan should stop for 3 s
+danjam status
 ```
 
 `danjam install` writes a per-user LaunchAgent (`local.danjam`) that runs `danjamd`. macOS then shows a one-time "Background Items Added" notice; keep it allowed. The log is `~/Library/Logs/danjam.log`.
+
+**Upgrade**
+
+```sh
+brew update
+brew upgrade danjam
+danjam install                 # restarts the LaunchAgent with the new danjamd
+```
+
+**Latest `main` instead of a release:** `brew install --HEAD danjam`.
 
 ## Ports
 - **Mac mini M4 front USB-C:** hub `3-1` (its USB3 half is `3-2`, switched together). Front left = port 2 (default), front right = port 1.
@@ -29,8 +54,9 @@ danjam test                    # the fan should stop for 3 s
 ## Remove
 
 ```sh
-danjam uninstall
+danjam uninstall               # stops it, removes the LaunchAgent; the log stays
 brew uninstall danjam
+brew untap dureh-gb/tap        # optional
 ```
 
 ## Build from source
