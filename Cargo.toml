@@ -1,6 +1,6 @@
 [package]
 name = "danjamd"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 repository = "https://github.com/dureh-gb/danjam"
 description = "단잠 (Danjam), macOS only: keep a USB fan on only while this Mac is really awake (screen on); off in sleep and dark wakes."
