@@ -1,8 +1,8 @@
 [package]
-name = "fan-sleepd"
+name = "danjamd"
 version = "0.1.0"
 edition = "2021"
-description = "Keep a USB fan on only while this Mac is really awake (screen on); off in sleep and dark wakes."
+description = "단잠 (Danjam): keep a USB fan on only while this Mac is really awake (screen on); off in sleep and dark wakes."
 
 [dependencies]
 

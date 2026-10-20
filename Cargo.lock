@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "fan-sleepd"
+name = "danjamd"
 version = "0.1.0"

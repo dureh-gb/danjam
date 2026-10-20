@@ -1,0 +1,142 @@
+#!/bin/bash
+# danjam (단잠, "sweet sleep"): a USB fan on while this Mac is really awake (screen on), off in sleep and dark wakes.
+#
+#   danjam install [--hub 3-1] [--port 2]   write the scripts + LaunchAgent and start it
+#   danjam uninstall                        stop it and remove the scripts and LaunchAgent (log kept)
+#   danjam status                           LaunchAgent, port state, recent log and wakes
+#   danjam test                             switch the fan port off for 3 s, then on again
+#   danjam log [n]                          the last n log lines (default 20) and the wakes they line up with
+#
+# How: the LaunchAgent runs danjamd (Rust, ~/Projects/danjam), which listens to macOS power capability
+# changes (IOPMConnection): before sleep -> port off, then lets the Mac sleep; dark wake (CPU, no graphics) -> off,
+# re-applied 2 and 6 s later because macOS re-powers the port as USB resumes; user wake (graphics on) -> on.
+# Why not sleepwatcher or a polling loop (2026-10-19): sleepwatcher ran no hook for dark wakes or the re-sleep after
+# them, and a loop is frozen from the moment of sleep while UserIsActive stays 1 through sleep.
+#
+# Safety: never switches a port that has a data device on it (uhubctl shows it as "connect"), e.g. the Logitech
+# receiver. Needs no sudo. Uses Homebrew's uhubctl (switching) and danjamd (power events).
+set -euo pipefail
+
+UHUBCTL=/opt/homebrew/bin/uhubctl
+DAEMON="$HOME/.local/bin/danjamd"
+LABEL=local.danjam
+PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+DIR="$HOME/.local/share/danjam"
+CONF="$HOME/.config/danjam.conf"
+LOG="$HOME/Library/Logs/danjam.log"
+DOMAIN="gui/$(id -u)"
+
+die() { echo "danjam: $*" >&2; exit 1; }
+need() { [ -x "$1" ] || die "$1 is missing (brew install $(basename "$1"))"; }
+load_conf() { HUB=3-1; PORT=2; [ -f "$CONF" ] && . "$CONF"; return 0; }
+
+# The uhubctl line for one port, or nothing.
+# uhubctl also lists (and switches) the USB3 twin of a front port (3-1 -> 3-2); read only the named hub's section.
+port_line() {
+	"$UHUBCTL" -l "$1" -p "$2" 2>/dev/null | awk -v hub="$1" -v port="$2" '
+		/status for hub/ { inhub = ($0 ~ ("hub " hub " ")) }
+		inhub && $1 == "Port" && $2 == (port ":") { sub(/^ +/, ""); print; exit }'
+}
+
+check_port() {
+	local line
+	line=$(port_line "$1" "$2")
+	[ -n "$line" ] || die "hub $1 port $2 not found (run: $UHUBCTL)"
+	case "$line" in
+	*connect*) die "hub $1 port $2 has a data device on it: $line -- refusing (that is not the fan)" ;;
+	esac
+}
+
+cmd_install() {
+	need "$UHUBCTL"; need "$DAEMON"
+	load_conf
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--hub) HUB=$2; shift 2 ;;
+		--port) PORT=$2; shift 2 ;;
+		*) die "unknown option $1" ;;
+		esac
+	done
+	check_port "$HUB" "$PORT"
+	# The tool was called fan-sleep until 2026-10-19: stop and remove that LaunchAgent and its files (its log stays).
+	if [ -f "$HOME/Library/LaunchAgents/local.fan-sleep.plist" ] || launchctl print "$DOMAIN/local.fan-sleep" >/dev/null 2>&1; then
+		launchctl bootout "$DOMAIN/local.fan-sleep" 2>/dev/null || true
+		rm -f "$HOME/Library/LaunchAgents/local.fan-sleep.plist" "$HOME/.config/fan-sleep.conf"
+		rm -rf "$HOME/.local/share/fan-sleep"
+		echo "removed the old fan-sleep LaunchAgent"
+	fi
+	mkdir -p "$DIR" "$(dirname "$CONF")" "$(dirname "$LOG")" "$(dirname "$PLIST")"
+	printf 'HUB=%s\nPORT=%s\n' "$HUB" "$PORT" > "$CONF"
+	rm -f "$DIR/sleep.sh" "$DIR/wake.sh" "$DIR/wake.pid"
+	cat > "$PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>$LABEL</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>$DAEMON</string>
+		<string>--hub</string><string>$HUB</string>
+		<string>--port</string><string>$PORT</string>
+		<string>--log</string><string>$LOG</string>
+	</array>
+	<key>RunAtLoad</key><true/>
+	<key>KeepAlive</key><true/>
+	<key>StandardErrorPath</key><string>$LOG</string>
+</dict>
+</plist>
+EOF
+	plutil -lint -s "$PLIST" || die "the LaunchAgent did not validate"
+	launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
+	launchctl bootstrap "$DOMAIN" "$PLIST"
+	echo "$(date '+%F %T') install: hub $HUB port $PORT (danjamd: on while the screen is on, off in sleep and dark wakes)" >> "$LOG"
+	echo "installed: hub $HUB port $PORT; on while this Mac is awake with its screen on, off in sleep and dark wakes. Log: $LOG"
+}
+
+cmd_uninstall() {
+	launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
+	rm -f "$PLIST" "$DIR/sleep.sh" "$DIR/wake.sh" "$DIR/wake.pid"
+	rmdir "$DIR" 2>/dev/null || true
+	echo "$(date '+%F %T') uninstall" >> "$LOG" 2>/dev/null || true
+	echo "removed (the fan port is left as it is now; the log stays at $LOG)"
+}
+
+recent_wakes() {
+	# Only the state lines (not "Wake Requests", "Kernel Client Acks" and the like).
+	pmset -g log 2>/dev/null | grep -E '^[0-9-]+ [0-9:]+ [-+][0-9]+ (Sleep|Wake|DarkWake)[[:space:]]{2,}' | tail -"${1:-8}" | cut -c1-170
+}
+
+cmd_status() {
+	load_conf
+	if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then
+		echo "LaunchAgent: loaded ($(launchctl print "$DOMAIN/$LABEL" | awk '/state =/{print $3; exit}'))"
+	else
+		echo "LaunchAgent: not loaded"
+	fi
+	echo "fan port: hub $HUB port $PORT -> $(port_line "$HUB" "$PORT" | sed 's/^ *//')"
+	echo "--- log"; tail -5 "$LOG" 2>/dev/null || echo "(no log yet)"
+	echo "--- recent sleep/wake"; recent_wakes 8
+}
+
+cmd_test() {
+	need "$UHUBCTL"; load_conf; check_port "$HUB" "$PORT"
+	echo "hub $HUB port $PORT off for 3 s - watch the fan"
+	"$UHUBCTL" -l "$HUB" -p "$PORT" -a cycle -d 3 >/dev/null
+	echo "back on: $(port_line "$HUB" "$PORT" | sed 's/^ *//')"
+}
+
+cmd_log() {
+	tail -"${1:-20}" "$LOG" 2>/dev/null || echo "(no log yet)"
+	echo "--- sleep/wake (an ATCn USBPlugEvent wake right after an 'on' line means the fan woke the Mac)"
+	recent_wakes 20
+}
+
+case "${1:-}" in
+install) shift; cmd_install "$@" ;;
+uninstall) cmd_uninstall ;;
+status) cmd_status ;;
+test) cmd_test ;;
+log) shift; cmd_log "$@" ;;
+*) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

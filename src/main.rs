@@ -1,4 +1,4 @@
-//! fan-sleepd: keep a USB fan on only while this Mac is really awake (its graphics are on), and off while it sleeps
+//! danjamd (단잠, "sweet sleep"): keep a USB fan on only while this Mac is really awake (its graphics are on), and off while it sleeps
 //! or is in a dark wake.
 //!
 //! macOS tells a power-management client (IOPMConnection, exported by IOKit) every time the system's capabilities
@@ -10,7 +10,7 @@
 //! The port is switched with Homebrew's `uhubctl`. A port with a data device on it (uhubctl shows "connect", e.g. a
 //! keyboard receiver) is never switched.
 //!
-//!     fan-sleepd [--hub 3-1] [--port 2] [--log ~/Library/Logs/fan-sleep.log]
+//!     danjamd [--hub 3-1] [--port 2] [--log ~/Library/Logs/danjam.log]
 
 use std::ffi::{c_void, CString};
 use std::fs::OpenOptions;
@@ -180,7 +180,7 @@ extern "C" fn on_event(_param: *mut c_void, conn: IOPMConnection, token: Token, 
 
 fn parse_args() -> Config {
     let home = std::env::var("HOME").unwrap_or_default();
-    let mut c = Config { hub: "3-1".into(), port: "2".into(), log: format!("{home}/Library/Logs/fan-sleep.log") };
+    let mut c = Config { hub: "3-1".into(), port: "2".into(), log: format!("{home}/Library/Logs/danjam.log") };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         let v = args.next().unwrap_or_else(|| usage(&format!("{a} needs a value")));
@@ -195,14 +195,14 @@ fn parse_args() -> Config {
 }
 
 fn usage(msg: &str) -> ! {
-    eprintln!("fan-sleepd: {msg}\nusage: fan-sleepd [--hub 3-1] [--port 2] [--log <file>]");
+    eprintln!("danjamd: {msg}\nusage: danjamd [--hub 3-1] [--port 2] [--log <file>]");
     std::process::exit(2)
 }
 
 fn main() {
     let _ = CONFIG.set(parse_args());
     unsafe {
-        let name = CString::new("fan-sleepd").unwrap();
+        let name = CString::new("danjamd").unwrap();
         let cf_name = CFStringCreateWithCString(std::ptr::null(), name.as_ptr(), UTF8);
         let mut conn: IOPMConnection = std::ptr::null_mut();
         let interests = CAP_CPU | CAP_VIDEO | CAP_AUDIO | CAP_NETWORK | CAP_DISK;
