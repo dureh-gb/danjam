@@ -22,10 +22,11 @@ Danjam switches off an **external USB fan plugged into a front USB-C port of a M
 
 ```sh
 brew tap dureh-gb/tap https://github.com/dureh-gb/homebrew-tap
+brew trust --formula dureh-gb/tap/danjam    # Homebrew asks you to trust a formula from a new tap once
 brew install danjam
 ```
 
-`brew install dureh-gb/tap/danjam` works as well once the tap is added.
+`brew install dureh-gb/tap/danjam` works as well once the tap is added and trusted. `brew trust dureh-gb/tap` trusts every formula in the tap instead.
 
 **Start it for your fan** (front-left port by default):
 
